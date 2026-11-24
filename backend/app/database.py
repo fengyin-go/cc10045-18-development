@@ -353,6 +353,59 @@ DDL_STATEMENTS = [
         daily_calls INTEGER DEFAULT 0,
         created_at TEXT NOT NULL DEFAULT (datetime('now'))
     )""",
+
+    # ==================== Audit Package Tier（可核验审计报告包） ====================
+    # 审计申请：一份申请可经历多次签发与多次交付，按申请号辨认。
+    """CREATE TABLE IF NOT EXISTS audit_applications (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        application_no TEXT NOT NULL UNIQUE,
+        title TEXT NOT NULL,
+        applicant TEXT NOT NULL DEFAULT '',
+        status TEXT NOT NULL DEFAULT '已受理',
+        created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    )""",
+
+    # 报告签发：只增不改。更正金额 = 插入新签发版本并标记旧版本"已被更正"，
+    # 旧版本行内容永不更新，保证任何时刻都能还原"当时实际签发了什么"。
+    """CREATE TABLE IF NOT EXISTS report_issuances (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        issuance_no TEXT NOT NULL UNIQUE,
+        application_id INTEGER NOT NULL,
+        version_no INTEGER NOT NULL,
+        amount REAL NOT NULL DEFAULT 0,
+        conclusion TEXT NOT NULL DEFAULT '',
+        metrics_json TEXT NOT NULL DEFAULT '[]',
+        credentials_json TEXT NOT NULL DEFAULT '{}',
+        report_output_id INTEGER,
+        supersedes_issuance_no TEXT,
+        status TEXT NOT NULL DEFAULT '已签发',
+        issued_by TEXT NOT NULL DEFAULT '',
+        issued_at TEXT NOT NULL DEFAULT (datetime('now')),
+        FOREIGN KEY (application_id) REFERENCES audit_applications(id)
+    )""",
+    "CREATE INDEX IF NOT EXISTS idx_issuances_app ON report_issuances(application_id, version_no)",
+
+    # 导出包：创建时锁定签发版本（issuance_id 不再改变），正文与凭据同源。
+    # 状态机：写入中 → 写入失败（可续做）→ 已交付（文件不可再被覆盖）。
+    """CREATE TABLE IF NOT EXISTS export_packages (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        package_no TEXT NOT NULL UNIQUE,
+        application_id INTEGER NOT NULL,
+        application_no TEXT NOT NULL,
+        issuance_id INTEGER NOT NULL,
+        issuance_no TEXT NOT NULL,
+        version_no INTEGER NOT NULL,
+        status TEXT NOT NULL DEFAULT '写入中',
+        body_sha256 TEXT,
+        credential_sha256 TEXT,
+        manifest_sha256 TEXT,
+        attempts INTEGER NOT NULL DEFAULT 0,
+        delivered_at TEXT,
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        FOREIGN KEY (application_id) REFERENCES audit_applications(id),
+        FOREIGN KEY (issuance_id) REFERENCES report_issuances(id)
+    )""",
+    "CREATE INDEX IF NOT EXISTS idx_packages_app ON export_packages(application_id)",
 ]
 
 

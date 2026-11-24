@@ -105,4 +105,7 @@ class DataExportService(BaseModuleService):
         snapshot = super().domain_snapshot()
         snapshot["total_exports"] = db.count("exports")
         snapshot["completed_exports"] = db.count("exports", "status='已完成'")
+        # 审计报告包：按已签发报告打包指标与取数凭据的可核验导出
+        snapshot["audit_packages"] = db.count("export_packages")
+        snapshot["audit_packages_delivered"] = db.count("export_packages", "status='已交付'")
         return snapshot

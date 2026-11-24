@@ -84,6 +84,36 @@ class DataReportService(BaseModuleService):
             "diffs": diffs,
         }
 
+    def output_by_issuance(self, issuance_no: str) -> dict[str, Any]:
+        """按导出文件记录的签发号，关联那一次签发的报告结果。
+
+        签发时报告结果已冻结进 report_outputs（issuance.report_output_id），
+        之后即使发出更正版本，旧签发号仍指向旧结果，可复核"当时交付了什么"。
+        """
+        issuance = db.fetchone(
+            "SELECT * FROM report_issuances WHERE issuance_no=?", [issuance_no])
+        if issuance is None:
+            return {"ok": False, "message": f"签发号 {issuance_no} 不存在"}
+        output = None
+        if issuance.get("report_output_id"):
+            output = db.fetchone(
+                "SELECT * FROM report_outputs WHERE id=?", [issuance["report_output_id"]])
+        if output is None:
+            return {"ok": False, "message": f"签发号 {issuance_no} 未关联报告输出"}
+        try:
+            content = json.loads(output["output_content"])
+        except (json.JSONDecodeError, TypeError):
+            content = {"raw": output["output_content"]}
+        return {
+            "ok": True,
+            "issuance_no": issuance_no,
+            "version_no": issuance["version_no"],
+            "issuance_status": issuance["status"],
+            "report_output_id": output["id"],
+            "generated_at": output["generated_at"],
+            "content": content,
+        }
+
     def domain_snapshot(self) -> dict[str, Any]:
         snapshot = super().domain_snapshot()
         snapshot["total_reports"] = db.count("reports")

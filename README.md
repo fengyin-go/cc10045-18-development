@@ -71,6 +71,35 @@ npm run dev
 | 漏斗分析器 | `funnel_analyzer` | 漏斗定义 | 漏斗名称、步骤序列、转化窗口小时 |
 | 多维数据集构建 | `cube_builder` | Cube定义 | Cube名称、事实表、维度组合 |
 
+## 审计报告包（可核验导出）
+
+分析结果导出模块新增审计报告包：按已签发报告打包报告指标与取数凭据，
+导出文件记录签发号，可按申请号辨认实际交出的报告版本。
+
+- 签发记录只增不改：更正金额 = 新签发版本（`supersedes` 串起更正链），
+  旧版本内容永不更新。
+- 导出包创建时锁定签发版本，正文与取数凭据必然同属一个签发版本；
+  写文件中途发出更正也不会混入新版本。
+- 写包分阶段落盘（正文 → 凭据 → 清单），中断后重试可续做；
+  已交付的包文件不可被后续更正覆盖，更正只能通过新包交付，
+  旧下载保留原始摘要供比较。
+- 数据报告按导出文件记录的签发号关联那一次签发的报告结果
+  （`GET /api/audit/packages/{包号}/report-output`）。
+
+接口（`/api/audit`）：受理 `POST /applications`、签发/更正
+`POST /applications/{申请号}/issuances`、建包
+`POST /applications/{申请号}/packages`、写制/续做
+`POST /packages/{包号}/write`、审计员核对 `POST /packages/{包号}/verify`、
+主管复核 `GET /applications/{申请号}/review`、文件下载
+`GET /packages/{包号}/files/{body|credentials|manifest}`。
+
+验收场景模拟（隔离环境，含"写凭据中断→更正签发→重试续做→按交付版本核对"
+全流程，初版 100 更正 90）：
+
+```bash
+cd backend && .venv/bin/python scripts/simulate_audit_package.py
+```
+
 ## 约定
 
 - 全部模块共享`frontend/src/views/WorkbenchView.vue|tsx`和一套资源路由。
